@@ -34,3 +34,9 @@ class ServiceDetailError extends ServiceState {
 
   ServiceDetailError(this.message);
 }
+
+class CategoriesLoaded extends ServiceState {
+  final List<String> categories;
+
+  CategoriesLoaded(this.categories);
+}

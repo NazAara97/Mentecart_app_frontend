@@ -70,9 +70,9 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     try {
       final res = await api.getBookingById(event.bookingId, {});
 
-      final booking = Booking.fromJson(res);
+      final bookings = Booking.fromJson(res);
 
-      emit(BookingLoaded(booking));
+      emit(BookingLoaded(bookings));
     } catch (e) {
       emit(BookingError(e.toString()));
     }
@@ -88,9 +88,9 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     try {
       final res = await api.payWithCash(event.bookingId);
 
-      final booking = Booking.fromJson(res["booking"]);
+      final bookings = Booking.fromJson(res["bookings"]);
 
-      emit(BookingPaymentSuccess(booking));
+      emit(BookingPaymentSuccess(bookings));
     } catch (e) {
       emit(BookingError(e.toString()));
     }
@@ -112,9 +112,9 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
         expiryYear: event.expiryYear,
       );
 
-      final booking = Booking.fromJson(res["booking"]);
+      final bookings = Booking.fromJson(res["bookings"]);
 
-      emit(BookingPaymentSuccess(booking));
+      emit(BookingPaymentSuccess(bookings));
     } catch (e) {
       emit(BookingError(e.toString()));
     }

@@ -6,21 +6,21 @@ class ServiceApi {
   static const String baseUrl = "http://192.168.1.101:3000"; 
  
 
-  Future<List<Service>> fetchServices() async {
-    final url = Uri.parse("$baseUrl/services/");
+  Future<List<Service>> fetchServices({String? category}) async {
+  final uri = Uri.parse("$baseUrl/services").replace(
+    queryParameters: category != null ? {"category": category} : null,
+  );
 
-    final response = await http.get(url);
+  final response = await http.get(uri);
 
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
+  if (response.statusCode == 200) {
+    final List data = jsonDecode(response.body);
 
-      return data.map((e) => Service.fromJson(e)).toList();
-    } else {
-      throw Exception("Failed to load services");
-    }
+    return data.map((e) => Service.fromJson(e)).toList();
+  } else {
+    throw Exception("Failed to load services");
   }
-
-
+}
 
   Future<Service> fetchServiceById(String id) async {
   final url = Uri.parse("$baseUrl/services/$id");

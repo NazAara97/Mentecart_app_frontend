@@ -11,9 +11,9 @@ class BookingItem {
 
   factory BookingItem.fromJson(Map<String, dynamic> json) {
     return BookingItem(
-      serviceId: json['serviceId'],
-      quantity: json['quantity'],
-      price: (json['price'] as num).toDouble(),
+      serviceId: json['serviceId']?.toString() ?? '',
+      quantity: json['quantity'] ?? 0,
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
@@ -29,27 +29,24 @@ class BookingItem {
 class Booking {
   final String id;
   final List<BookingItem> items;
-  final DateTime appointmentDate;
   final double totalAmount;
   final String status;
 
   Booking({
     required this.id,
     required this.items,
-    required this.appointmentDate,
     required this.totalAmount,
     required this.status,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) {
     return Booking(
-      id: json['_id'],
-      items: (json['items'] as List)
+      id: json['_id']?.toString() ?? '',
+      items: (json['items'] as List? ?? [])
           .map((e) => BookingItem.fromJson(e))
           .toList(),
-      appointmentDate: DateTime.parse(json['appointmentDate']),
-      totalAmount: (json['totalAmount'] as num).toDouble(),
-      status: json['status'],
+      totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
+      status: json['status']?.toString() ?? 'unknown',
     );
   }
 }

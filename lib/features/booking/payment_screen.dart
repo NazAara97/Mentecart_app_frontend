@@ -29,6 +29,7 @@ class PaymentScreen extends StatefulWidget {
 
 class _PaymentScreenState extends State<PaymentScreen> {
   bool isLoading = false;
+  bool _completed = false;
 
   final cardNameController = TextEditingController();
   final cardNumberController = TextEditingController();
@@ -44,46 +45,39 @@ class _PaymentScreenState extends State<PaymentScreen> {
     super.dispose();
   }
 
-  void _setLoading(bool value) {
+  void _setLoading(bool v) {
     if (!mounted) return;
-    setState(() => isLoading = value);
+    setState(() => isLoading = v);
   }
 
-  void _successAndExit(String message) {
-    context.read<CartBloc>().add(ClearCartEvent());
-    context.read<ServiceBloc>().add(FetchServicesEvent());
+  void _finish(bool result, String message) {
+    if (_completed) return;
+    _completed = true;
+
+    _setLoading(false);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
 
-    // return SUCCESS to CheckoutScreen
-    Navigator.pop(context, true);
+    if (result) {
+      context.read<CartBloc>().add(ClearCartEvent());
+      context.read<ServiceBloc>().add(FetchServicesEvent());
+    }
+
+    Navigator.pop(context, result);
   }
 
-  void _failAndExit() {
-    Navigator.pop(context, false);
-  }
-
-  /// 💵 CASH PAYMENT
   void payWithCash() {
     _setLoading(true);
-
-    context.read<BookingBloc>().add(
-          PayCashEvent(widget.bookingId),
-        );
+    context.read<BookingBloc>().add(PayCashEvent(widget.bookingId));
   }
 
-  /// ❌ CANCEL BOOKING
   void cancelBooking() {
     _setLoading(true);
-
-    context.read<BookingBloc>().add(
-          CancelBookingEvent(widget.bookingId),
-        );
+    context.read<BookingBloc>().add(CancelBookingEvent(widget.bookingId));
   }
 
-  /// 💳 CARD PAYMENT DIALOG
   void showCardDialog() {
     showDialog(
       context: context,
@@ -93,32 +87,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: cardNameController,
-                decoration: const InputDecoration(labelText: "Card Holder"),
-              ),
-              TextField(
-                controller: cardNumberController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Card Number"),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: expiryMonthController,
-                      decoration: const InputDecoration(labelText: "MM"),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: expiryYearController,
-                      decoration: const InputDecoration(labelText: "YYYY"),
-                    ),
-                  ),
-                ],
-              ),
+              TextField(controller: cardNameController),
+              TextField(controller: cardNumberController),
             ],
           ),
           actions: [
@@ -129,7 +99,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-
                 _setLoading(true);
 
                 context.read<BookingBloc>().add(
@@ -162,25 +131,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Widget build(BuildContext context) {
     return BlocListener<BookingBloc, BookingState>(
       listener: (context, state) {
-        _setLoading(false);
+        if (_completed) return;
 
-        /// ✅ SUCCESS
         if (state is BookingPaymentSuccess) {
-          _successAndExit("Booking Confirmed 🎉");
+          _finish(true, "Booking Confirmed 🎉");
         }
 
-        /// ❌ CANCEL SUCCESS
-        if (state is BookingCancelSuccess) {
-          _successAndExit("Booking Cancelled ❌");
+        else if (state is BookingCancelSuccess) {
+          _finish(false, "Booking Cancelled ❌");
         }
 
-        /// ⚠ ERROR (IMPORTANT FIX FOR NULL ISSUE)
-        if (state is BookingError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message ?? "Something went wrong")),
-          );
-
-          _failAndExit();
+        else if (state is BookingError) {
+          _finish(false, state.message ?? "");
         }
       },
 
