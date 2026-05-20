@@ -45,16 +45,22 @@ class CartBloc extends Bloc<CartEvent, CartState> {
   }
 
   // ADD ITEM
-  Future<void> _onAddToCart(
-      AddToCartEvent event, Emitter<CartState> emit) async {
-    try {
-      await api.addToCart(event.serviceId);
-      add(FetchCartEvent());
-    } catch (e) {
-      emit(CartError(e.toString()));
-    }
-  }
+ Future<void> _onAddToCart(
+  AddToCartEvent event,
+  Emitter<CartState> emit,
+) async {
+  try {
+    await api.addToCart(
+      event.serviceId,
+      event.date,
+      event.time,
+    );
 
+    add(FetchCartEvent());
+  } catch (e) {
+    emit(CartError(e.toString()));
+  }
+}
   // REMOVE ITEM
   Future<void> _onRemoveItem(
       RemoveCartItemEvent event, Emitter<CartState> emit) async {
@@ -73,6 +79,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       await api.updateCartItem(
         event.itemId,
         event.quantity,
+        
       );
 
       // refresh cart after update

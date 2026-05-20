@@ -11,7 +11,7 @@ class Service {
     required this.id,
     required this.title,
     required this.price, 
-    required this.description,
+    required this.description, required String category, required int duration,
   });
 
   factory Service.fromJson(Map<String, dynamic> json) {
@@ -20,8 +20,21 @@ class Service {
       title: json['title'],
       price: (json['price'] as num).toDouble(),
       description: json['description'],
+      category: json['category'] ?? "",
+      duration: json['duration'] ?? 0,
     );
   }
+
+ factory Service.empty() {
+  return Service(
+    id: "",
+    title: "Unknown Service",
+    description: "",
+    price: 0,
+    duration: 0,
+    category: "",
+  );
+}
 
  
 

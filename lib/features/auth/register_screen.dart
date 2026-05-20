@@ -4,78 +4,143 @@ import 'bloc/auth_bloc.dart';
 import 'bloc/auth_event.dart';
 import 'bloc/auth_state.dart';
 
-class RegisterScreen extends StatelessWidget {
+class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final emailController = TextEditingController();
-    final passwordController = TextEditingController();
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
 
+class _RegisterScreenState extends State<RegisterScreen> {
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+
+  bool isPasswordVisible = false;
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  void registerUser() {
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    // ✅ EMPTY CHECK
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Enter all fields")),
+      );
+      return;
+    }
+
+    // ✅ EMAIL VALIDATION
+    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+    if (!emailRegex.hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid email format")),
+      );
+      return;
+    }
+
+    // ✅ PASSWORD VALIDATION
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Password must be at least 6 characters"),
+        ),
+      );
+      return;
+    }
+
+    // 🚀 CALL BLOC
+    context.read<AuthBloc>().add(SignupEvent(email, password));
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Register")),
       body: Padding(
         padding: const EdgeInsets.all(16),
 
-        // 👇 LISTENER FOR STATES
         child: BlocConsumer<AuthBloc, AuthState>(
           listener: (context, state) {
             if (state is AuthSuccess) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Signup Successful ✅")),
+                const SnackBar(
+                  content: Text("Signup Successful ✅"),
+                  backgroundColor: Colors.green,
+                ),
               );
 
-              // 👉 Navigate after success (optional)
               Navigator.pop(context);
             }
 
             if (state is AuthError) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.message)),
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: Colors.red,
+                ),
               );
             }
           },
 
           builder: (context, state) {
             return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // 📧 EMAIL
                 TextField(
                   controller: emailController,
-                  decoration: const InputDecoration(labelText: "Email"),
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: "Email",
+                    border: OutlineInputBorder(),
+                  ),
                 ),
 
+                const SizedBox(height: 12),
+
+                // 🔒 PASSWORD WITH TOGGLE
                 TextField(
                   controller: passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: "Password"),
+                  obscureText: !isPasswordVisible,
+                  decoration: InputDecoration(
+                    labelText: "Password",
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        isPasswordVisible
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          isPasswordVisible = !isPasswordVisible;
+                        });
+                      },
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: 20),
 
-                // 👇 LOADING HANDLING
+                // 🔄 LOADING / BUTTON
                 state is AuthLoading
-                    ? const CircularProgressIndicator()
+                    ? const Center(child: CircularProgressIndicator())
                     : ElevatedButton(
-                        onPressed: () {
-                          final email = emailController.text.trim();
-                          final password = passwordController.text.trim();
-
-                          // ✅ VALIDATION
-                          if (email.isEmpty || password.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("Enter all fields"),
-                              ),
-                            );
-                            return;
-                          }
-
-                          // 🚀 CALL BLOC EVENT
-                          context.read<AuthBloc>().add(
-                                SignupEvent(email, password),
-                              );
-                        },
-                        child: const Text("Register"),
+                        onPressed: registerUser,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text(
+                          "Register",
+                          style: TextStyle(fontSize: 16),
+                        ),
                       ),
               ],
             );

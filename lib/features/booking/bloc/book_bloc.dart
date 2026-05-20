@@ -8,11 +8,16 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
   final BookingApi api;
 
   BookingBloc(this.api) : super(BookingInitial()) {
+
+    // ✅ EVENTS
     on<CreateBookingEvent>(_createBooking);
     on<FetchBookingsEvent>(_fetchBookings);
     on<CancelBookingEvent>(_cancelBooking);
-    on<PayBookingEvent>(_payBooking);
-    on<GetBookingByIdEvent>(_getBookingById); // ✅ FIX ADDED
+    on<GetBookingByIdEvent>(_getBookingById);
+
+    // ✅ NEW PAYMENT EVENTS
+    on<PayCashEvent>(_payCash);
+    on<PayCardEvent>(_payCard);
   }
 
   // ---------------- CREATE BOOKING ----------------
@@ -25,7 +30,7 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     try {
       final res = await api.checkout(
         event.appointmentDate,
-        event.items, // ✅ FIXED (no casting)
+        event.items,
       );
 
       final booking = Booking.fromJson(res);
@@ -63,7 +68,6 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     emit(BookingLoading());
 
     try {
-      // pass a second argument to match BookingApi.getBookingById signature
       final res = await api.getBookingById(event.bookingId, {});
 
       final booking = Booking.fromJson(res);
@@ -74,43 +78,61 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     }
   }
 
-  // ---------------- CANCEL BOOKING ----------------
- Future<void> _cancelBooking(
-  CancelBookingEvent event,
-  Emitter<BookingState> emit,
-) async {
-  emit(BookingLoading());
+  // ---------------- 💵 PAY WITH CASH ----------------
+  Future<void> _payCash(
+    PayCashEvent event,
+    Emitter<BookingState> emit,
+  ) async {
+    emit(BookingLoading());
 
-  try {
-    await api.cancelBooking(event.bookingId);
+    try {
+      final res = await api.payWithCash(event.bookingId);
 
-    emit(BookingCancelSuccess()); // ✅ emit success
-  } catch (e) {
-    emit(BookingError(e.toString()));
+      final booking = Booking.fromJson(res["booking"]);
+
+      emit(BookingPaymentSuccess(booking));
+    } catch (e) {
+      emit(BookingError(e.toString()));
+    }
   }
-}
 
-  // ---------------- PAYMENT ----------------
- Future<void> _payBooking(
-  PayBookingEvent event,
-  Emitter<BookingState> emit,
-) async {
-  emit(BookingLoading());
+  // ---------------- 💳 PAY WITH CARD ----------------
+  Future<void> _payCard(
+    PayCardEvent event,
+    Emitter<BookingState> emit,
+  ) async {
+    emit(BookingLoading());
 
-  try {
-    await api.payment(
-      event.bookingId,
-      event.method,
-      event.transactionId,
-      cardHolderName: event.cardHolderName,
-      cardNumber: event.cardNumber,
-      expiryMonth: event.expiryMonth,
-      expiryYear: event.expiryYear,
-    );
+    try {
+      final res = await api.payWithCard(
+        bookingId: event.bookingId,
+        cardHolderName: event.cardHolderName,
+        cardNumber: event.cardNumber,
+        expiryMonth: event.expiryMonth,
+        expiryYear: event.expiryYear,
+      );
 
-    emit(BookingPaymentSuccess()); // ✅ emit success ONLY
-  } catch (e) {
-    emit(BookingError(e.toString()));
+      final booking = Booking.fromJson(res["booking"]);
+
+      emit(BookingPaymentSuccess(booking));
+    } catch (e) {
+      emit(BookingError(e.toString()));
+    }
   }
-}
+
+  // ---------------- ❌ CANCEL BOOKING ----------------
+  Future<void> _cancelBooking(
+    CancelBookingEvent event,
+    Emitter<BookingState> emit,
+  ) async {
+    emit(BookingLoading());
+
+    try {
+      await api.cancelBooking(event.bookingId);
+
+      emit(BookingCancelSuccess());
+    } catch (e) {
+      emit(BookingError(e.toString()));
+    }
+  }
 }

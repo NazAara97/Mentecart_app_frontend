@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mentecart_app/features/cart/models/cart_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,8 +31,10 @@ class CartApi {
     };
   }
 
-  // ✅ GET CART
-   Future<Cart> fetchCart() async {
+  
+   
+   /// ✅ GET CART
+  Future<Cart> fetchCart() async {
     final url = Uri.parse("$baseUrl/cart/");
     final headers = await getAuthHeaders();
 
@@ -41,37 +44,50 @@ class CartApi {
     print("GET CART BODY: ${response.body}");
 
     if (response.statusCode == 200) {
-      final Map<String, dynamic> data =
-          jsonDecode(response.body) as Map<String, dynamic>;
-
+      final data = jsonDecode(response.body);
       return Cart.fromJson(data);
     } else {
-      throw Exception("Failed to load cart: ${response.body}");
+      throw Exception("Failed to load cart");
     }
   }
 
-  /// ✅ ADD TO CART
-  Future<void> addToCart(String serviceId) async {
-    final url = Uri.parse("$baseUrl/cart/items");
-    final headers = await getAuthHeaders();
+  /// ✅ ADD TO CART WITH DATE & TIME
+  Future<void> addToCart(
+  String serviceId,
+  DateTime date,
+  TimeOfDay time,
+) async {
+  final url = Uri.parse("$baseUrl/cart/items");
+  final headers = await getAuthHeaders();
 
-    final response = await http.post(
-      url,
-      headers: headers,
-      body: jsonEncode({
-        "serviceId": serviceId,
-        "quantity": 1,
-      }),
-    );
+  final formattedDate =
+      "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
 
-    print("ADD STATUS: ${response.statusCode}");
-    print("ADD BODY: ${response.body}");
+  final formattedTime =
+      "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
 
-    if (response.statusCode != 200) {
-      throw Exception(response.body);
-    }
+  final body = jsonEncode({
+    "serviceId": serviceId,
+    "date": formattedDate,
+    "time": formattedTime,
+    "quantity": 1,
+  });
+
+  print("REQUEST BODY: $body"); // 👈 DEBUG (VERY IMPORTANT)
+
+  final response = await http.post(
+    url,
+    headers: headers,
+    body: body,
+  );
+
+  print("STATUS: ${response.statusCode}");
+  print("BODY: ${response.body}");
+
+  if (response.statusCode != 200) {
+    throw Exception(response.body);
   }
-
+}
 
    // ✅ UPDATE ITEM
   Future<void> updateCartItem(String itemId, int quantity) async {
@@ -83,6 +99,7 @@ class CartApi {
       headers: headers,
       body: jsonEncode({
         "quantity": quantity,
+       
       }),
     );
 

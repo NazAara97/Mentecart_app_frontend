@@ -34,7 +34,7 @@ class BookingApi {
   // 🧾 CHECKOUT
   Future<Map<String, dynamic>> checkout(
   DateTime appointmentDate,
-  List items,
+  List items
 ) async {
   final headers = await getAuthHeaders();
 
@@ -44,6 +44,9 @@ class BookingApi {
       "serviceId": e.service.id ?? e.service["_id"], // ✅ FIXED
       "quantity": e.quantity,
       "price": e.service.price,
+        // ✅ REQUIRED (THIS FIXES YOUR ISSUE)
+      "date": e.date,
+      "time": e.time,
     }).toList(),
   };
 
@@ -116,41 +119,58 @@ class BookingApi {
     throw Exception("Cancel failed");
   }
 }
-
-  // 💳 PAYMENT
-  Future<Map<String, dynamic>> payment(
-  String bookingId,
-  String method,
-  String transactionId, {
-  String? cardHolderName,
-  String? cardNumber,
-  String? expiryMonth,
-  String? expiryYear,
+// 💳 PAY WITH CARD
+Future<Map<String, dynamic>> payWithCard({
+  required String bookingId,
+  required String cardHolderName,
+  required String cardNumber,
+  required String expiryMonth,
+  required String expiryYear,
 }) async {
   final headers = await getAuthHeaders();
 
-  final res = await http.post(
-    Uri.parse("$baseUrl/bookings/$bookingId/payment"),
-    headers: headers,
-    body: jsonEncode({
-      "method": method,
-      "transactionId": transactionId,
+  final body = {
+    "transactionId": DateTime.now().millisecondsSinceEpoch.toString(),
+    "cardHolderName": cardHolderName,
+    "cardNumber": cardNumber,
+    "expiryMonth": expiryMonth,
+    "expiryYear": expiryYear,
+  };
 
-      // 💳 send card data
-      "cardHolderName": cardHolderName,
-      "cardNumber": cardNumber,
-      "expiryMonth": expiryMonth,
-      "expiryYear": expiryYear,
-    }),
+  final res = await http.post(
+    Uri.parse("$baseUrl/bookings/$bookingId/pay-card"),
+    headers: headers,
+    body: jsonEncode(body),
   );
 
-  print("PAYMENT STATUS: ${res.statusCode}");
-  print("PAYMENT BODY: ${res.body}");
+  print("CARD PAYMENT STATUS: ${res.statusCode}");
+  print("CARD PAYMENT BODY: ${res.body}");
 
   if (res.statusCode != 200) {
-    throw Exception("Payment failed");
+    throw Exception("Card payment failed: ${res.body}");
   }
 
   return jsonDecode(res.body);
 }
+
+
+// 💵 PAY WITH CASH
+Future<Map<String, dynamic>> payWithCash(String bookingId) async {
+  final headers = await getAuthHeaders();
+
+  final res = await http.post(
+    Uri.parse("$baseUrl/bookings/$bookingId/pay-cash"),
+    headers: headers,
+  );
+
+  print("CASH PAYMENT STATUS: ${res.statusCode}");
+  print("CASH PAYMENT BODY: ${res.body}");
+
+  if (res.statusCode != 200) {
+    throw Exception("Cash payment failed: ${res.body}");
+  }
+
+  return jsonDecode(res.body);
+}
+  
 }

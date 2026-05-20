@@ -12,9 +12,7 @@ class CartLoaded extends CartState {
 
   CartLoaded(this.cart);
 
-  get cartItems => null;
-
-  get items => null;
+  
 }
 
 class CartError extends CartState {

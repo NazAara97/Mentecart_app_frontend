@@ -1,4 +1,5 @@
 import 'package:mentecart_app/features/booking/bloc/book_state.dart';
+import 'package:mentecart_app/features/booking/models/booking_model.dart';
 
 abstract class BookingEvent {}
 
@@ -24,26 +25,28 @@ class GetBookingByIdEvent extends BookingEvent {
   GetBookingByIdEvent(this.bookingId);
 }
 
-class BookingPaymentSuccess extends BookingState {}
+class BookingPaymentSuccess extends BookingState {
+  BookingPaymentSuccess(Booking booking);
+}
 class BookingLoaded extends BookingState {
   final dynamic booking;
   BookingLoaded(this.booking);
 }
 
-class PayBookingEvent extends BookingEvent {
+class PayCashEvent extends BookingEvent {
   final String bookingId;
-  final String method;
-  final String transactionId;
+  PayCashEvent(this.bookingId);
+}
 
+class PayCardEvent extends BookingEvent {
+  final String bookingId;
   final String cardHolderName;
   final String cardNumber;
   final String expiryMonth;
   final String expiryYear;
 
-  PayBookingEvent({
+  PayCardEvent({
     required this.bookingId,
-    required this.method,
-    required this.transactionId,
     required this.cardHolderName,
     required this.cardNumber,
     required this.expiryMonth,

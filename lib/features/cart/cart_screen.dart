@@ -17,7 +17,6 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  DateTime selectedDateTime = DateTime.now();
   bool isLoading = false;
 
   @override
@@ -44,83 +43,54 @@ class _CartScreenState extends State<CartScreen> {
     return subtotal + getTax(subtotal);
   }
 
-  String formatDateTime(DateTime dateTime) {
-    return "${dateTime.day.toString().padLeft(2, '0')}/"
-        "${dateTime.month.toString().padLeft(2, '0')}/"
-        "${dateTime.year}  "
-        "${dateTime.hour.toString().padLeft(2, '0')}:"
-        "${dateTime.minute.toString().padLeft(2, '0')}";
-  }
-
-  Future<void> pickDateTime() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: selectedDateTime,
-      firstDate: DateTime.now(),
-      lastDate: DateTime(2100),
-    );
-
-    if (date == null) return;
-
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(selectedDateTime),
-    );
-
-    if (time == null) return;
-
-    setState(() {
-      selectedDateTime = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time.hour,
-        time.minute,
-      );
-    });
-  }
-
-  /// ✅ FIXED CHECKOUT FLOW (NO DATA BREAKING)
+  /// ✅ UPDATED CHECKOUT (NO GLOBAL DATE)
   Future<void> proceedCheckout(List items) async {
-    setState(() => isLoading = true);
+  setState(() => isLoading = true);
+
+  try {
+    final bookingApi = BookingApi(ApiService());
+
+    DateTime appointmentDate;
 
     try {
-      final bookingApi = BookingApi(ApiService());
-
-      final booking = await bookingApi.checkout(
-        selectedDateTime,
-        items,
+      appointmentDate = DateTime.parse(
+        "${items.first.date}T${items.first.time}",
       );
-
-      print("BOOKING SAVED: $booking");
-
-      if (!mounted) return;
-
-      final bookingId = booking["_id"];
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CheckoutScreen(
-            items: items, 
-            selectedDateTime: selectedDateTime,
-            total: (booking["totalAmount"] ?? 0).toDouble(),
-            bookingId: bookingId,
-          ),
-        ),
-      );
-
-      context.read<CartBloc>().add(ClearCartEvent());
     } catch (e) {
-      print("CHECKOUT ERROR: $e");
-
-      
-    } finally {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
+      appointmentDate = DateTime.now();
     }
+
+    final booking = await bookingApi.checkout(
+      appointmentDate,
+      items,
+    );
+
+    print("BOOKING SAVED: $booking");
+
+    if (!mounted) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CheckoutScreen(
+          items: items,
+          total: (booking["totalAmount"] ?? 0).toDouble(),
+          bookingId: booking["_id"],
+        ),
+      ),
+    );
+
+   
+  } catch (e) {
+    print("CHECKOUT ERROR: $e");
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Checkout failed")),
+    );
+  } finally {
+    if (mounted) setState(() => isLoading = false);
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -159,19 +129,7 @@ class _CartScreenState extends State<CartScreen> {
             return ListView(
               padding: const EdgeInsets.all(12),
               children: [
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.calendar_today),
-                    title: const Text("Appointment Date & Time"),
-                    subtitle: Text(formatDateTime(selectedDateTime)),
-                    trailing: TextButton(
-                      onPressed: pickDateTime,
-                      child: const Text("Change"),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 10),
+                /// ❌ REMOVED GLOBAL DATE CARD
 
                 ...items.map((item) {
                   return Card(
@@ -190,7 +148,20 @@ class _CartScreenState extends State<CartScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(item.service.description),
+
                           const SizedBox(height: 10),
+
+                          /// ✅ SHOW ITEM DATE & TIME
+                          Row(
+                            children: [
+                              const Icon(Icons.access_time, size: 16),
+                              const SizedBox(width: 6),
+                              Text("${item.date} at ${item.time}"),
+                            ],
+                          ),
+
+                          const SizedBox(height: 10),
+
                           Text("Price: Rs. ${item.service.price}"),
                           Text(
                             "Total: Rs. ${(item.service.price * item.quantity).toStringAsFixed(0)}",
@@ -198,6 +169,7 @@ class _CartScreenState extends State<CartScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+
                           const SizedBox(height: 10),
 
                           Row(
@@ -213,6 +185,7 @@ class _CartScreenState extends State<CartScreen> {
                                                   UpdateCartItemEvent(
                                                     item.id,
                                                     item.quantity - 1,
+                                                    item.service.id,
                                                   ),
                                                 );
                                           }
@@ -226,6 +199,7 @@ class _CartScreenState extends State<CartScreen> {
                                             UpdateCartItemEvent(
                                               item.id,
                                               item.quantity + 1,
+                                              item.service.id,
                                             ),
                                           );
                                     },
@@ -254,7 +228,7 @@ class _CartScreenState extends State<CartScreen> {
         ),
       ),
 
-      /// 💳 BOTTOM BAR (UNCHANGED DESIGN)
+      /// 💳 BOTTOM BAR
       bottomNavigationBar: BlocBuilder<CartBloc, CartState>(
         builder: (context, state) {
           if (state is! CartLoaded) {

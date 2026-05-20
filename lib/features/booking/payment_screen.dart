@@ -15,14 +15,12 @@ class PaymentScreen extends StatefulWidget {
   final String bookingId;
   final double total;
   final List items;
-  final DateTime dateTime;
 
   const PaymentScreen({
     super.key,
     required this.bookingId,
     required this.total,
     required this.items,
-    required this.dateTime,
   });
 
   @override
@@ -30,97 +28,172 @@ class PaymentScreen extends StatefulWidget {
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
-  bool isPaying = false;
-  bool isCancelling = false;
+  bool isLoading = false;
 
   final cardNameController = TextEditingController();
   final cardNumberController = TextEditingController();
   final expiryMonthController = TextEditingController();
   final expiryYearController = TextEditingController();
 
-  void payNow() {
+  @override
+  void dispose() {
+    cardNameController.dispose();
+    cardNumberController.dispose();
+    expiryMonthController.dispose();
+    expiryYearController.dispose();
+    super.dispose();
+  }
+
+  void _setLoading(bool value) {
+    if (!mounted) return;
+    setState(() => isLoading = value);
+  }
+
+  void _successAndExit(String message) {
+    context.read<CartBloc>().add(ClearCartEvent());
+    context.read<ServiceBloc>().add(FetchServicesEvent());
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+
+    // return SUCCESS to CheckoutScreen
+    Navigator.pop(context, true);
+  }
+
+  void _failAndExit() {
+    Navigator.pop(context, false);
+  }
+
+  /// 💵 CASH PAYMENT
+  void payWithCash() {
+    _setLoading(true);
+
     context.read<BookingBloc>().add(
-          PayBookingEvent(
-            bookingId: widget.bookingId,
-            method: "card",
-            transactionId:
-                DateTime.now().millisecondsSinceEpoch.toString(),
-            cardHolderName: cardNameController.text,
-            cardNumber: cardNumberController.text,
-            expiryMonth: expiryMonthController.text,
-            expiryYear: expiryYearController.text,
-          ),
+          PayCashEvent(widget.bookingId),
         );
   }
 
+  /// ❌ CANCEL BOOKING
   void cancelBooking() {
+    _setLoading(true);
+
     context.read<BookingBloc>().add(
-      CancelBookingEvent(widget.bookingId),
-    );
+          CancelBookingEvent(widget.bookingId),
+        );
   }
 
-  void _goHome() {
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      '/home_screen.dart',
-      (route) => false,
+  /// 💳 CARD PAYMENT DIALOG
+  void showCardDialog() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text("Enter Card Details"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: cardNameController,
+                decoration: const InputDecoration(labelText: "Card Holder"),
+              ),
+              TextField(
+                controller: cardNumberController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: "Card Number"),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: expiryMonthController,
+                      decoration: const InputDecoration(labelText: "MM"),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: expiryYearController,
+                      decoration: const InputDecoration(labelText: "YYYY"),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+
+                _setLoading(true);
+
+                context.read<BookingBloc>().add(
+                      PayCardEvent(
+                        bookingId: widget.bookingId,
+                        cardHolderName: cardNameController.text.isEmpty
+                            ? "Unknown"
+                            : cardNameController.text,
+                        cardNumber: cardNumberController.text.isEmpty
+                            ? "0000"
+                            : cardNumberController.text,
+                        expiryMonth: expiryMonthController.text.isEmpty
+                            ? "00"
+                            : expiryMonthController.text,
+                        expiryYear: expiryYearController.text.isEmpty
+                            ? "0000"
+                            : expiryYearController.text,
+                      ),
+                    );
+              },
+              child: const Text("Pay"),
+            ),
+          ],
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocListener<BookingBloc, BookingState>(
-      listener: (context, state) async {
+      listener: (context, state) {
+        _setLoading(false);
 
-        /// ✅ PAYMENT SUCCESS
+        /// ✅ SUCCESS
         if (state is BookingPaymentSuccess) {
-          if (!mounted) return;
-
-          setState(() => isPaying = false);
-
-          context.read<CartBloc>().add(ClearCartEvent());
-          context.read<ServiceBloc>().add(FetchServicesEvent());
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Booking Confirmed 🎉")),
-          );
-
-          _goHome();
+          _successAndExit("Booking Confirmed 🎉");
         }
 
         /// ❌ CANCEL SUCCESS
         if (state is BookingCancelSuccess) {
-          if (!mounted) return;
-
-          setState(() => isCancelling = false);
-
-          context.read<CartBloc>().add(ClearCartEvent());
-          context.read<ServiceBloc>().add(FetchServicesEvent());
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Booking Cancelled ❌")),
-          );
-
-          _goHome();
+          _successAndExit("Booking Cancelled ❌");
         }
 
-        /// ⚠ ERROR
+        /// ⚠ ERROR (IMPORTANT FIX FOR NULL ISSUE)
         if (state is BookingError) {
-          if (!mounted) return;
-
-          setState(() {
-            isPaying = false;
-            isCancelling = false;
-          });
-
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
+            SnackBar(content: Text(state.message ?? "Something went wrong")),
           );
+
+          _failAndExit();
         }
       },
 
       child: Scaffold(
-        appBar: AppBar(title: const Text("Payment")),
+        appBar: AppBar(
+          title: const Text("Payment"),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              Navigator.pop(context, false);
+            },
+          ),
+        ),
 
         body: Padding(
           padding: const EdgeInsets.all(16),
@@ -129,85 +202,25 @@ class _PaymentScreenState extends State<PaymentScreen> {
               Text("Booking ID: ${widget.bookingId}"),
               Text("Total: Rs. ${widget.total.toStringAsFixed(0)}"),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
 
-              TextField(
-                controller: cardNameController,
-                decoration: const InputDecoration(
-                  labelText: "Card Holder Name",
-                ),
-              ),
-
-              TextField(
-                controller: cardNumberController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "Card Number",
-                ),
-              ),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: expiryMonthController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: "MM"),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: expiryYearController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: "YYYY"),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              /// PAY BUTTON
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: isPaying
-                      ? null
-                      : () {
-                          setState(() => isPaying = true);
-                          payNow();
-                        },
-                  child: isPaying
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text("Pay Now"),
-                ),
+              ElevatedButton(
+                onPressed: isLoading ? null : payWithCash,
+                child: const Text("Pay With Cash"),
               ),
 
               const SizedBox(height: 10),
 
-              /// CANCEL BUTTON
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: isCancelling
-                      ? null
-                      : () {
-                          setState(() => isCancelling = true);
-                          cancelBooking();
-                        },
-                  child: isCancelling
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text("Cancel Booking"),
-                ),
+              ElevatedButton(
+                onPressed: isLoading ? null : showCardDialog,
+                child: const Text("Pay With Card"),
+              ),
+
+              const SizedBox(height: 10),
+
+              OutlinedButton(
+                onPressed: isLoading ? null : cancelBooking,
+                child: const Text("Cancel Booking"),
               ),
             ],
           ),
